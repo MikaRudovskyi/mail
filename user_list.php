@@ -8,11 +8,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista utenti</title>
-    <link rel="stylesheet" href="css/user_list.css">
+    <link rel="stylesheet" href="css/userList.css">
 </head>
 <body>
     <h1>Lista utenti registrati</h1>
-
+    <a href="index.php">Torna a Login</a>
     <?php
         $query_ricevi = "SELECT `firstname`, `lastname`, `email`, `birth_date` FROM `users`";
         $result = mysqli_query($conn, $query_ricevi);
@@ -46,8 +46,5 @@
             echo "<h1>Opss. Errore nella query. Riprova</h1>";
         }
     ?>
-
-    <a href="index.php">Torna a Login</a>
-
 </body>
 </html>
