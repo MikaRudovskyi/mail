@@ -1,65 +1,75 @@
 <?php
-    include "connection/connect.php";
-    session_start();
+include "connection/connect.php";
+session_start();
 
-    if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["email"], $_POST["password"])) {
-        $email = $_POST["email"];
-        $psw = $_POST["password"];
+// Авторизация
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["email"], $_POST["password"])) {
+    $email = $_POST["email"];
+    $psw = $_POST["password"];
 
-        $query = "SELECT email, password, firstname FROM users WHERE email = ? AND password = ?";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("ss", $email, $psw);
-        $stmt->execute();
-        $result = $stmt->get_result();
+    $query = "SELECT email, password, firstname FROM users WHERE email = ? AND password = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("ss", $email, $psw);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-        if ($result && $result->num_rows > 0) {
-            $row = $result->fetch_assoc();
-            $_SESSION["user_email"] = $row["email"];
-            $_SESSION["user_name"] = $row["firstname"];
-        } else {
-            echo "<h1>Errore</h1>";
-            echo "<p class='error'>Errore nelle credenziali. Riprova per favore.</p>";
-            echo "<a href='index.php'>Torna a login</a>";
-            exit;
-        }
-    }
-
-    if (!isset($_SESSION["user_email"])) {
-        header("Location: index.php");
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $_SESSION["user_email"] = $row["email"];
+        $_SESSION["user_name"] = $row["firstname"];
+    } else {
+        echo "<h1>Errore</h1>";
+        echo "<p class='error'>Errore nelle credenziali. Riprova per favore.</p>";
+        echo "<a href='index.php'>Torna a login</a>";
         exit;
     }
+}
 
-    $user_email = $_SESSION["user_email"];
-    $user_name = $_SESSION["user_name"];
+if (!isset($_SESSION["user_email"])) {
+    header("Location: index.php");
+    exit;
+}
 
-    if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["send_message"])) {
-        $receiver = $_POST["receiver"];
-        $subject = $_POST["subject"];
-        $message = $_POST["message"];
+$user_email = $_SESSION["user_email"];
+$user_name = $_SESSION["user_name"];
 
-        if (!empty($receiver) && !empty($subject) && !empty($message)) {
-            $query = "INSERT INTO emails (sender, receiver, subject, message, timestamp) VALUES (?, ?, ?, ?, NOW())";
-            $stmt = $conn->prepare($query);
-            $stmt->bind_param("ssss", $user_email, $receiver, $subject, $message);
+// Отправка сообщений
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["send_message"])) {
+    $receiver = $_POST["receiver"];
+    $subject = $_POST["subject"];
+    $message = $_POST["message"];
 
-            if ($stmt->execute()) {
-                $send_success = "Messaggio inviato con successo a <strong>" . htmlspecialchars($receiver) . "</strong>!";
-            } else {
-                $send_error = "Errore durante l'invio del messaggio. Riprova.";
-            }
+    if (!empty($receiver) && !empty($subject) && !empty($message)) {
+        $query = "INSERT INTO emails (sender, receiver, subject, message, timestamp) VALUES (?, ?, ?, ?, NOW())";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("ssss", $user_email, $receiver, $subject, $message);
+
+        if ($stmt->execute()) {
+            $send_success = "Messaggio inviato con successo a <strong>" . htmlspecialchars($receiver) . "</strong>!";
         } else {
-            $send_error = "Tutti i campi sono obbligatori.";
+            $send_error = "Errore durante l'invio del messaggio. Riprova.";
         }
+    } else {
+        $send_error = "Tutti i campi sono obbligatori.";
     }
-?>
+}
 
+// Пометка сообщения как прочитанного
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["mark_read"], $_POST["email_id"])) {
+    $email_id = $_POST["email_id"];
+    $query = "UPDATE emails SET is_read = 1 WHERE id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $email_id);
+    $stmt->execute();
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Benvenuto</title>
-    <link rel="stylesheet" href="css/profile.css">
+    <link rel="stylesheet" href="css/profile_style.css">
 </head>
 <body>
     <div class="logout-container">
@@ -99,10 +109,20 @@
 
             if ($result && $result->num_rows > 0) {
                 while ($email = $result->fetch_assoc()) {
-                    echo "<li><strong>Da:</strong> " . htmlspecialchars($email["sender"]) . "<br>";
+                    $is_read = $email["is_read"] == 0 ? "font-weight: bold;" : "";
+                    echo "<li style='$is_read'><strong>Da:</strong> " . htmlspecialchars($email["sender"]) . "<br>";
                     echo "<strong>Oggetto:</strong> " . htmlspecialchars($email["subject"]) . "<br>";
                     echo "<strong>Messaggio:</strong> " . htmlspecialchars($email["message"]) . "<br>";
-                    echo "<small>" . $email["timestamp"] . "</small></li>";
+                    echo "<small>" . $email["timestamp"] . "</small>";
+                    
+                    if ($email["is_read"] == 0) {
+                        echo "<form method='POST' style='display:inline;'>";
+                        echo "<input type='hidden' name='email_id' value='" . $email["id"] . "'>";
+                        echo "<button type='submit' class='mark-read-button' name='mark_read'>Segna come letto</button>";
+                        echo "</form>";
+                    }
+
+                    echo "</li>";
                 }
             } else {
                 echo "<li>Nessuna posta trovata.</li>";
